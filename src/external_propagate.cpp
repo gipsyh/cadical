@@ -125,7 +125,7 @@ bool Internal::external_propagate () {
 
   size_t before = num_assigned;
 
-  if (!conflict && external_prop && !external_prop_is_lazy) {
+  if (!conflict && external_prop && !external_prop_is_lazy && !private_steps) {
 #ifndef NDEBUG
     if (opts.reimply)
       LOG ("External propagation starts (decision level: %d, notified "
@@ -828,7 +828,7 @@ bool Internal::external_check_solution () {
 // Notify the external propagator that an observed variable got assigned.
 //
 void Internal::notify_assignments () {
-  if (!external_prop || external_prop_is_lazy)
+  if (!external_prop || external_prop_is_lazy || private_steps)
     return;
 
   if (!opts.reimply) {
@@ -840,7 +840,7 @@ void Internal::notify_assignments () {
       if (fixed (ilit) || !observed (ilit))
         continue; // fixed literals are notified eagerly in mark_fixed, not
                   // here
-      int elit = externalize (ilit); // TODO: double-check tainting
+      int elit = externalize (ilit); // TODO: double-check ta inting
       assert (elit);
       assert (external->observed (elit));
       external->propagator->notify_assignment (elit, false);
@@ -931,7 +931,7 @@ void Internal::connect_propagator () {
 // Notify the external propagator that a new decision level is started.
 //
 void Internal::notify_decision () {
-  if (!external_prop || external_prop_is_lazy)
+  if (!external_prop || external_prop_is_lazy || private_steps)
     return;
   external->propagator->notify_new_decision_level ();
 }
@@ -941,7 +941,7 @@ void Internal::notify_decision () {
 // Notify the external propagator that backtrack to new_level.
 //
 void Internal::notify_backtrack (size_t new_level) {
-  if (!external_prop || external_prop_is_lazy)
+  if (!external_prop || external_prop_is_lazy || private_steps)
     return;
   external->propagator->notify_backtrack (new_level);
 }
@@ -952,14 +952,16 @@ void Internal::notify_backtrack (size_t new_level) {
 // decision.
 //
 int Internal::ask_decision () {
-  if (!external_prop || external_prop_is_lazy)
+  if (!external_prop || external_prop_is_lazy || private_steps)
     return 0;
+  
+  notify_assignments ();
   int elit = external->propagator->cb_decide ();
   stats.ext_prop.ext_cb++;
 
   if (!elit)
     return 0;
-  LOG ("external propagator wants to propose a decision: %d", elit);
+  LOG ("external propagator proposes decision: %d", elit);
   assert (external->is_observed[abs (elit)]);
   if (!external->is_observed[abs (elit)])
     return 0;
